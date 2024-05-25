@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 
 class TicketController extends Controller
 {
@@ -77,30 +78,46 @@ class TicketController extends Controller
         return response()->json($ticket->load('user', 'userProfile', 'replies'));
     }
 
+
     public function update(Request $request, Ticket $ticket)
     {
-        $request->validate([
+        Log::info('Update method called');
+        Log::info('Request data: ', $request->all());
+
+        $validatedData = $request->validate([
             'subject' => 'sometimes|required|string|max:255',
             'assign_staff' => 'sometimes|required|integer|exists:users,id',
             'company_id' => 'sometimes|required|integer|exists:companies,id',
+            'user_id' => 'sometimes|nullable|exists:users,id',
             'priority' => 'sometimes|required|string',
             'description' => 'sometimes|required|string',
             'status' => 'sometimes|required|string',
             'to_email' => 'sometimes|required|email',
-            'message_id' => 'sometimes|required|string',
+            'cc' => 'sometimes|nullable|string',
         ]);
 
-        $ticket->update($request->only([
-            'subject', 'assign_staff', 'company_id', 'priority', 'cc', 'description', 'file', 'status', 'to_email', 'message_id'
-        ]));
+        Log::info('Validated data: ', $validatedData);
 
-        if ($request->file('file')) {
-            $ticket->file = $request->file('file')->store('files');
+        Log::info('Current ticket state: ', $ticket->toArray());
+
+        $updated = false;
+        foreach ($validatedData as $key => $value) {
+            if ($ticket->$key !== $value) {
+                $ticket->$key = $value;
+                $updated = true;
+            }
+        }
+
+        if ($updated) {
             $ticket->save();
+            Log::info('Ticket updated: ', $ticket->toArray());
+        } else {
+            Log::info('No changes detected.');
         }
 
         return response()->json($ticket);
     }
+
 
     public function destroy(Ticket $ticket)
     {
