@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\TicketController;
+use App\Http\Controllers\ReplyController;
 
 Route::middleware(['auth:sanctum'])->get('/user', function (Request $request) {
     return $request->user();
@@ -21,4 +22,5 @@ Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanct
     Route::get('tickets/{ticket}', [TicketController::class, 'show']);
     Route::put('tickets/{ticket}', [TicketController::class, 'update']);
     Route::delete('tickets/{ticket}', [TicketController::class, 'destroy']);
+    Route::post('/tickets/{ticket}/replies', [ReplyController::class, 'store']);
 // });
