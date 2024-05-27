@@ -44,5 +44,6 @@ class Kernel extends HttpKernel
     protected $routeMiddleware = [
         'log.requests' => \App\Http\Middleware\LogRequests::class,
         'csrf' => \App\Http\Middleware\VerifyCsrfToken::class,
+        'simulateAuth' => \App\Http\Middleware\SimulateAuth::class,
     ];
 }

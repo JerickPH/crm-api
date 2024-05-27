@@ -12,6 +12,9 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use App\Models\Activity;
+
+
 
 class TicketController extends Controller
 {
@@ -73,6 +76,7 @@ class TicketController extends Controller
         }
     }
 
+
     public function show(Ticket $ticket)
     {
         return response()->json($ticket->load('user', 'userProfile', 'replies'));
@@ -97,10 +101,11 @@ class TicketController extends Controller
         ]);
 
         Log::info('Validated data: ', $validatedData);
-
         Log::info('Current ticket state: ', $ticket->toArray());
 
         $updated = false;
+        $originalStatus = $ticket->status;
+
         foreach ($validatedData as $key => $value) {
             if ($ticket->$key !== $value) {
                 $ticket->$key = $value;
@@ -111,6 +116,17 @@ class TicketController extends Controller
         if ($updated) {
             $ticket->save();
             Log::info('Ticket updated: ', $ticket->toArray());
+
+            if ($originalStatus !== $ticket->status) {
+                $userId = auth()->id();
+                Log::info('Logging Activity: status change by User ID: ' . $userId);
+                Activity::create([
+                    'user_id' => $userId,
+                    'action' => "changed the status to {$ticket->status}",
+                    'subject_id' => $ticket->id,
+                    'subject_type' => Ticket::class,
+                ]);
+            }
         } else {
             Log::info('No changes detected.');
         }
@@ -124,6 +140,7 @@ class TicketController extends Controller
         $ticket->delete();
         return response()->json(null, 204);
     }
+
 
     private function generateUniqueFilename($file)
     {
@@ -140,4 +157,26 @@ class TicketController extends Controller
 
         return "{$slug}.{$extension}";
     }
+
+
+    //Activities of the Ticket
+    public function replyToTicket(Request $request, Ticket $ticket)
+    {
+        $reply = Reply::create([
+            'ticket_id' => $ticket->id,
+            'user_id' => auth()->id(),
+            'message' => $request->input('message'),
+        ]);
+
+        Activity::create([
+            'user_id' => auth()->id(),
+            'action' => "replied to the ticket with message: {$reply->message}",
+            'subject_id' => $ticket->id,
+            'subject_type' => Ticket::class,
+        ]);
+
+        return response()->json(['message' => 'Reply added successfully.']);
+    }
+
+
 }
