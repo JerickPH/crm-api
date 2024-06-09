@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\TicketCreated;
 use App\Models\Ticket;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+// use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -77,9 +77,10 @@ class TicketController extends Controller
     }
 
 
-    public function show(Ticket $ticket)
+    public function show($id)
     {
-        return response()->json($ticket->load('user', 'userProfile', 'replies'));
+        $ticket = Ticket::with(['assignedUser.userProfile', 'replies', 'creator'])->findOrFail($id);
+        return response()->json($ticket);
     }
 
 
@@ -101,11 +102,11 @@ class TicketController extends Controller
         ]);
 
         Log::info('Validated data: ', $validatedData);
+
         Log::info('Current ticket state: ', $ticket->toArray());
 
         $updated = false;
-        $originalStatus = $ticket->status;
-
+        
         foreach ($validatedData as $key => $value) {
             if ($ticket->$key !== $value) {
                 $ticket->$key = $value;
@@ -117,16 +118,17 @@ class TicketController extends Controller
             $ticket->save();
             Log::info('Ticket updated: ', $ticket->toArray());
 
-            if ($originalStatus !== $ticket->status) {
-                $userId = auth()->id();
-                Log::info('Logging Activity: status change by User ID: ' . $userId);
-                Activity::create([
-                    'user_id' => $userId,
-                    'action' => "changed the status to {$ticket->status}",
-                    'subject_id' => $ticket->id,
-                    'subject_type' => Ticket::class,
-                ]);
-            }
+            $userId = auth()->check() ? auth()->user()->id : null;
+
+            // Store activity
+            Activity::create([
+                'user_id' => $userId,
+                'action' => 'update',
+                'subject_type' => Ticket::class,
+                'subject_id' => $ticket->id,
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
         } else {
             Log::info('No changes detected.');
         }
@@ -137,8 +139,20 @@ class TicketController extends Controller
 
     public function destroy(Ticket $ticket)
     {
+        $userId = auth()->check() ? auth()->user()->id : null;
+
+        Activity::create([
+            'user_id' => $userId,
+            'action' => 'delete',
+            'subject_type' => Ticket::class,
+            'subject_id' => $ticket->id,
+            'created_at' => now(),
+            'updated_at' => now()
+        ]);
+
         $ticket->delete();
-        return response()->json(null, 204);
+
+        return response()->json(['message' => 'Ticket deleted']);
     }
 
 
